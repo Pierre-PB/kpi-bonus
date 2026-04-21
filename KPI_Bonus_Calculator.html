@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Bonus Calculator — TDI · YESSS UK Credit Control</title>
+
+<!-- SheetJS for Excel import/export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Firebase (compat build) for real-time sync -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+  :root {
+    --primary: #1e40af;
+    --primary-light: #3b82f6;
+    --accent: #f59e0b;
+    --red: #e53935;
+    --ok: #16a34a;
+    --warn: #dc2626;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+    --input-bg: #fefce8;
+    --dept-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    --dept-accent: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* ======== HEADER ======== */
+  header.app-header {
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .brand-logo { height: 58px; }
+  .brand-text h1 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--text);
+    font-weight: 700;
+  }
+  .brand-text .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+    letter-spacing: 0.2px;
+  }
+  .brand-text .dept-tag {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--red);
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .header-tools {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .header-tools select, .header-tools input[type="text"] {
+    background: white;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    outline: none;
+  }
+  .header-btn {
+    background: white;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .header-btn:hover { background: #f8fafc; border-color: var(--primary-light); }
+  .header-btn.primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .header-btn.primary:hover { background: #1e3a8a; }
+  .header-btn.accent {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .header-btn.accent:hover { background: #d97706; }
+
+  .sync-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    background: #f1f5f9;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sync-chip:hover { background: #e2e8f0; }
+  .sync-chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #94a3b8;
+  }
+  .sync-chip.online .dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+  .sync-chip.online { color: #15803d; background: #dcfce7; }
+  .sync-chip.error .dot { background: var(--warn); }
+  .sync-chip.error { color: #991b1b; background: #fee2e2; }
+
+  /* ======== DEPARTMENT BANNER ======== */
+  .dept-banner {
+    background: var(--dept-bg);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 2px solid var(--dept-accent);
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.05);
+  }
+  .dept-shield {
+    width: 50px; height: 50px;
+    background: rgba(56,189,248,0.15);
+    border: 2px solid var(--dept-accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .dept-info { flex: 1; }
+  .dept-name {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .dept-lead {
+    color: var(--dept-accent);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    margin-top: 2px;
+  }
+  .dept-count {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 1px;
+  }
+  .dept-stats {
+    display: flex;
+    gap: 18px;
+  }
+  .dept-stat {
+    text-align: right;
+  }
+  .dept-stat .lbl {
+    font-size: 10px;
+    opacity: 0.65;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .dept-stat .val {
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ======== TABS ======== */
+  .tabs {
+    display: flex;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 12px 18px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: all 0.15s;
+    font-size: 13px;
+  }
+  .tab:hover { color: var(--primary); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+  .tab .pill {
+    background: var(--primary);
+    color: white;
+    border-radius: 9px;
+    padding: 0 6px;
+    font-size: 10px;
+    margin-left: 4px;
+    font-weight: 700;
+  }
+
+  main { padding: 18px 24px; max-width: 1700px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: var(--primary);
+  }
+  .card .formula {
+    background: #eff6ff;
+    border-left: 3px solid var(--primary);
+    padding: 10px 14px;
+    margin: 8px 0 16px;
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    color: #1e3a8a;
+    line-height: 1.6;
+  }
+  .card .formula code {
+    background: rgba(30,64,175,0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:hover { background: #f8fafc; }
+  tbody tr.total-row {
+    background: #dbeafe !important;
+    font-weight: 700;
+  }
+  tbody tr.total-row td { border-top: 2px solid var(--primary); }
+  tbody tr.clickable { cursor: pointer; }
+  tbody tr.clickable:hover { background: #eff6ff !important; }
+
+  input[type="text"], input[type="number"], textarea {
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 100%;
+    background: var(--input-bg);
+    font-variant-numeric: tabular-nums;
+    font-family: inherit;
+  }
+  input[type="number"] { text-align: right; }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+  }
+  textarea { resize: vertical; font-family: 'Consolas', monospace; font-size: 12px; background: white; }
+  .computed {
+    background: #f1f5f9;
+    color: var(--muted);
+    padding: 5px 8px;
+    border-radius: 4px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .bonus-cell {
+    background: #dcfce7 !important;
+    color: #166534;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  button:hover { background: #1e3a8a; }
+  button.secondary {
+    background: white;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  button.secondary:hover { background: #eff6ff; }
+  button.danger { background: var(--warn); }
+  button.danger:hover { background: #b91c1c; }
+  button.small { padding: 4px 8px; font-size: 12px; }
+  button.ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  button.ghost:hover { background: #f1f5f9; color: var(--text); }
+  button.success { background: var(--ok); }
+  button.success:hover { background: #15803d; }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toolbar .spacer { flex: 1; }
+
+  .param-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .param-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .param-card h3 {
+    margin: 0 0 12px;
+    color: var(--primary);
+    font-size: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 12px;
+  }
+  .param-row label {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .param-row input { width: 100px; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-card .value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-card .value small { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  .agent-col { min-width: 120px; font-weight: 500; }
+  .actions-col { width: 80px; }
+  .delete-btn {
+    background: transparent;
+    color: var(--warn);
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  .delete-btn:hover { background: #fee2e2; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.green { background: #dcfce7; color: #166534; }
+  .badge.red { background: #fee2e2; color: #991b1b; }
+  .badge.gold { background: #fef3c7; color: #92400e; }
+  .badge.blue { background: #dbeafe; color: #1e40af; }
+  .badge.grey { background: #f1f5f9; color: var(--muted); }
+
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  .muted { color: var(--muted); }
+
+  .chart-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-wrap h3 {
+    margin: 0 0 12px 0;
+    color: var(--primary);
+    font-size: 15px;
+  }
+  svg.bar-chart { width: 100%; height: 280px; }
+  svg.bar-chart .bar { fill: var(--primary-light); transition: fill 0.15s; cursor: pointer; }
+  svg.bar-chart .bar:hover { fill: var(--primary); }
+  svg.bar-chart .label { font-size: 11px; fill: var(--muted); }
+  svg.bar-chart .value-label { font-size: 10px; fill: var(--text); font-weight: 600; }
+  svg.bar-chart .axis { stroke: var(--border); stroke-width: 1; }
+
+  .heatmap td.heat { text-align: right; font-variant-numeric: tabular-nums; padding: 6px 10px; cursor: pointer; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-state h3 { color: var(--text); }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: white; border-radius: 10px; padding: 24px; width: 100%; max-width: 500px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    max-height: 90vh; overflow: auto;
+  }
+  .modal h3 { margin: 0 0 14px; color: var(--primary); }
+  .modal .field { margin-bottom: 12px; }
+  .modal label { display: block; font-size: 13px; color: var(--text); margin-bottom: 4px; font-weight: 500; }
+  .modal input, .modal textarea { background: white; border: 1px solid var(--border); }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+  .toast {
+    position: fixed; bottom: 20px; right: 20px; z-index: 200;
+    background: var(--text); color: white; padding: 10px 16px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    animation: slideIn 0.2s ease-out;
+    max-width: 360px;
+  }
+  .toast.success { background: var(--ok); }
+  .toast.warn { background: var(--warn); }
+  .toast.info { background: var(--primary); }
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .presence-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .presence-avatar {
+    background: var(--primary);
+    color: white;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+  .presence-avatar.self { background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+  .activity-log {
+    max-height: 240px; overflow-y: auto;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .activity-item {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background: white;
+    border: 1px solid var(--border);
+  }
+  .activity-item .who { font-weight: 600; color: var(--primary); }
+  .activity-item .when { color: var(--muted); font-size: 11px; }
+
+  @media print {
+    header.app-header, .tabs, .toolbar, .no-print, .dept-banner { display: none !important; }
+    .section { display: block !important; page-break-after: always; }
+    body { background: white; font-size: 11px; }
+    main { padding: 0; }
+    .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======== APP HEADER ======== -->
+<header class="app-header">
+  <div class="brand">
+    <!-- TDI Logo (SVG recreation) -->
+    <svg class="brand-logo" viewBox="0 0 560 260" xmlns="http://www.w3.org/2000/svg" aria-label="TDI logo">
+      <defs>
+        <linearGradient id="tdiBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#60A5FA"/>
+          <stop offset="50%" stop-color="#3B82F6"/>
+          <stop offset="100%" stop-color="#1E40AF"/>
+        </linearGradient>
+        <linearGradient id="tdiRed" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#EF4444"/>
+          <stop offset="100%" stop-color="#B91C1C"/>
+        </linearGradient>
+      </defs>
+      <!-- Rising pixel fragments -->
+      <g fill="url(#tdiBlue)">
+        <rect x="88" y="2" width="20" height="13" rx="2" opacity="0.55"/>
+        <rect x="116" y="8" width="16" height="11" rx="2" opacity="0.7"/>
+        <rect x="140" y="0" width="26" height="15" rx="2" opacity="0.85"/>
+        <rect x="72" y="20" width="18" height="12" rx="2" opacity="0.6"/>
+        <rect x="96" y="26" width="22" height="14" rx="2" opacity="0.8"/>
+        <rect x="126" y="22" width="28" height="16" rx="2"/>
+        <rect x="162" y="32" width="18" height="14" rx="2" opacity="0.8"/>
+      </g>
+      <!-- Curved shape -->
+      <path d="M 140 48 Q 30 48 30 142 Q 30 236 140 236 L 140 210 Q 60 210 60 142 Q 60 78 140 78 Z" fill="url(#tdiBlue)"/>
+      <!-- Inner bar (I) -->
+      <rect x="98" y="64" width="26" height="146" rx="2" fill="url(#tdiBlue)"/>
+      <!-- TDI wordmark -->
+      <text x="200" y="188" font-family="'Arial Black',Arial,sans-serif" font-weight="900" font-size="148" fill="url(#tdiRed)" letter-spacing="4">TDI</text>
+      <!-- Tagline -->
+      <text x="200" y="238" font-family="Arial,sans-serif" font-weight="700" font-size="15" fill="#B91C1C" letter-spacing="2.5">TRAITEMENT DES DONNÉES INFORMATIQUES</text>
+    </svg>
+    <div class="brand-text">
+      <h1>KPI Bonus Calculator</h1>
+      <div class="subtitle">YESSS UK · Back Office Tunisia</div>
+      <div class="dept-tag">CREDIT CONTROL DEPARTMENT</div>
+    </div>
+  </div>
+  <div class="header-tools">
+    <div class="sync-chip" id="syncChip" onclick="setActiveTab('team')">
+      <span class="dot"></span><span id="syncLabel">Offline</span>
+    </div>
+    <label style="font-size:12px;color:var(--muted)">Period:</label>
+    <select id="periodSelect" onchange="switchPeriod(this.value)"></select>
+    <button class="header-btn" onclick="openNewPeriodModal()">+ New month</button>
+    <button class="header-btn accent" onclick="document.getElementById('importFile').click()">📥 Import Excel</button>
+    <input type="file" id="importFile" accept=".xlsx,.xltx,.xls" style="display:none" onchange="importExcel(event)">
+  </div>
+</header>
+
+<!-- ======== DEPARTMENT BANNER ======== -->
+<div class="dept-banner">
+  <div class="dept-shield">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  </div>
+  <div class="dept-info">
+    <div class="dept-name">Credit Control</div>
+    <div class="dept-lead">RHAMA BEN YAHIA</div>
+    <div class="dept-count"><span id="deptCount">7</span> employees</div>
+  </div>
+  <div class="dept-stats">
+    <div class="dept-stat">
+      <div class="lbl">Team bonus · <span id="deptPeriod">—</span></div>
+      <div class="val"><span id="deptTotal">0</span> DT</div>
+    </div>
+    <div class="dept-stat">
+      <div class="lbl">Average</div>
+      <div class="val"><span id="deptAvg">0</span> DT</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== TABS ======== -->
+<nav class="tabs" id="tabs">
+  <div class="tab active" data-section="dashboard">Dashboard</div>
+  <div class="tab" data-section="inbound">Inbound</div>
+  <div class="tab" data-section="outbound">Outbound</div>
+  <div class="tab" data-section="bd">B&amp;D</div>
+  <div class="tab" data-section="debtor">Debtor Days</div>
+  <div class="tab" data-section="history">History</div>
+  <div class="tab" data-section="settings">Settings</div>
+  <div class="tab" data-section="team">Team &amp; Sync</div>
+</nav>
+
+<main>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="section active" id="dashboard">
+    <div class="summary-grid">
+      <div class="stat-card"><div class="label">Active period</div><div class="value" id="statPeriod" style="font-size:16px">—</div></div>
+      <div class="stat-card"><div class="label">Employees</div><div class="value" id="statAgents">0</div></div>
+      <div class="stat-card"><div class="label">Total bonus</div><div class="value"><span id="statTotal">0</span> <small>DT</small></div></div>
+      <div class="stat-card"><div class="label">Average</div><div class="value"><span id="statAvg">0</span> <small>DT</small></div></div>
+      <div class="stat-card"><div class="label">Max</div><div class="value"><span id="statMax">0</span> <small>DT</small></div></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">Bonus summary</h2>
+        <div class="spacer"></div>
+        <span class="hint" id="lastEditLabel"></span>
+        <button class="secondary" onclick="exportCSV()">Export CSV</button>
+        <button class="secondary" onclick="exportXLSX()">Export Excel</button>
+        <button class="secondary" onclick="window.print()">Print</button>
+        <button onclick="saveStateJSON()">Save JSON</button>
+        <button class="secondary" onclick="document.getElementById('loadFile').click()">Load JSON</button>
+        <input type="file" id="loadFile" accept=".json" style="display:none" onchange="loadStateJSON(event)">
+        <button class="danger" onclick="resetCurrent()">Reset period</button>
+      </div>
+      <p class="hint">Tip: click on an employee row to see their full bonus history.</p>
+      <table id="summaryTable">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th class="num">B&amp;D (DT)</th>
+            <th class="num">Outbound (DT)</th>
+            <th class="num">Debtor Days (DT)</th>
+            <th class="num">Inbound (DT)</th>
+            <th class="num">Rank 1 OB (DT)</th>
+            <th class="num">TOTAL (DT)</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+        <tfoot id="summaryFoot"></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ INBOUND ============ -->
+  <section class="section" id="inbound">
+    <div class="card">
+      <h2>Inbound — Incoming calls</h2>
+      <div class="formula">
+        <strong>Inputs:</strong> Extension, Name, Calls Answered, % Calls Serviced.<br>
+        <strong>Formula:</strong> Final Score = average(% Calls Serviced, Calls Answered / Max(Calls Answered)).
+        <code>Bonus = Final Score × <span class="pk-inbound">30</span> DT</code>.
+      </div>
+      <div class="toolbar">
+        <button onclick="addAgent('inbound')" class="small">+ Add row</button>
+        <div class="spacer"></div>
+        <span class="hint">Enter Calls Answered and % Calls Serviced — the rest is computed.</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Extension</th>
+            <th class="agent-col">Employee</th>
+            <th class="num">Calls Answered</th>
+            <th class="num">% Calls Serviced</th>
+            <th class="num">% vs Max</th>
+            <th class="num">Final Score</th>
+            <th class="num">Bonus (DT)</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody id="inboundBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ OUTBOUND ============ -->
+  <section class="section" id="outbound">
+    <div class="card">
+      <h2>Outbound — Outgoing calls</h2>
+      <div class="formula">
+        <strong>Inputs:</strong> Extension, Name, Outbound Calls.<br>
+        <strong>Rule:</strong>
+        • If Calls ≥ Target (<span class="pk-outbound-target">150</span>): <code>Bonus = <span class="pk-outbound">80</span> DT</code>.<br>
+        • Otherwise: <code>Bonus = (Calls / Target) × <span class="pk-outbound-under">30</span> DT</code>.<br>
+        • Top outbound (rank 1): <code>+ <span class="pk-outbound-rank">30</span> DT</code>.
+      </div>
+      <div class="toolbar">
+        <button onclick="addAgent('outbound')" class="small">+ Add row</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Extension</th>
+            <th class="agent-col">Employee</th>
+            <th class="num">Outbound Calls</th>
+            <th class="num">Attainment</th>
+            <th class="num">Base bonus (DT)</th>
+            <th class="num">Rank 1 (DT)</th>
+            <th class="num">Total (DT)</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody id="outboundBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ B&D ============ -->
+  <section class="section" id="bd">
+    <div class="card">
+      <h2>B&amp;D — Balance &amp; Debits</h2>
+      <div class="formula">
+        <strong>Inputs:</strong> Name, Initial charge, Final charge.<br>
+        <strong>Rule:</strong> If final ≤ 0 (credit or zero): 100%.
+        Otherwise: Rate = (Initial − Final) / Initial.
+        <code>Bonus = Rate × <span class="pk-bd">30</span> DT</code>.
+      </div>
+      <div class="toolbar">
+        <button onclick="addAgent('bd')" class="small">+ Add row</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="agent-col">Employee</th>
+            <th class="num">Initial charge (DT)</th>
+            <th class="num">Final charge (DT)</th>
+            <th>Status</th>
+            <th class="num">Rate</th>
+            <th class="num">Bonus (DT)</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody id="bdBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ DEBTOR DAYS ============ -->
+  <section class="section" id="debtor">
+    <div class="card">
+      <h2>Debtor Days — Collection performance</h2>
+      <div class="formula">
+        <strong>Inputs:</strong> Name, Initial Debtor, Final Debtor.<br>
+        <strong>Formula:</strong> Reduction = Initial − Final. Rate = Reduction / Max(Reduction) across team.
+        <code>Bonus = Rate × <span class="pk-debtor">30</span> DT</code>.
+      </div>
+      <div class="toolbar">
+        <button onclick="addAgent('debtor')" class="small">+ Add row</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="agent-col">Employee</th>
+            <th class="num">Initial Debtor</th>
+            <th class="num">Final Debtor</th>
+            <th class="num">Reduction</th>
+            <th class="num">% vs Top</th>
+            <th class="num">Bonus (DT)</th>
+            <th class="actions-col"></th>
+          </tr>
+        </thead>
+        <tbody id="debtorBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section class="section" id="history">
+    <div class="chart-wrap">
+      <h3>Team bonus evolution</h3>
+      <div id="chartTotal"></div>
+    </div>
+
+    <div class="card">
+      <h2>Saved periods</h2>
+      <p class="hint">Click a period row to load it in the editor. Changes are auto-saved and synced.</p>
+      <table id="periodsTable">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th class="num">Employees</th>
+            <th class="num">Total (DT)</th>
+            <th class="num">Average (DT)</th>
+            <th class="num">Max (DT)</th>
+            <th>Last update</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="periodsBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Drill-down — bonus per employee per period</h2>
+      <p class="hint">Employees identified by first name. Cells shaded by bonus intensity. Click a cell to open that period.</p>
+      <div style="overflow-x:auto">
+        <table class="heatmap" id="heatmapTable">
+          <thead id="heatmapHead"></thead>
+          <tbody id="heatmapBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section class="section" id="settings">
+    <div class="card">
+      <h2>Bonus rules — active period</h2>
+      <p class="hint">These parameters are stored per period. Changing a past month's rules only affects that month's calculation.</p>
+    </div>
+    <div class="param-grid">
+      <div class="param-card">
+        <h3>Inbound</h3>
+        <div class="param-row"><label>Max bonus (DT)</label><input type="number" id="p_inbound_max" value="30" step="1"></div>
+      </div>
+      <div class="param-card">
+        <h3>Outbound</h3>
+        <div class="param-row"><label>Target (calls)</label><input type="number" id="p_outbound_target" value="150" step="1"></div>
+        <div class="param-row"><label>Full bonus (target met)</label><input type="number" id="p_outbound_max" value="80" step="1"></div>
+        <div class="param-row"><label>Proportional base (under target)</label><input type="number" id="p_outbound_under" value="30" step="1"></div>
+        <div class="param-row"><label>Rank 1 bonus (DT)</label><input type="number" id="p_outbound_rank1" value="30" step="1"></div>
+      </div>
+      <div class="param-card">
+        <h3>B&amp;D</h3>
+        <div class="param-row"><label>Max bonus (DT)</label><input type="number" id="p_bd_max" value="30" step="1"></div>
+      </div>
+      <div class="param-card">
+        <h3>Debtor Days</h3>
+        <div class="param-row"><label>Max bonus (DT)</label><input type="number" id="p_debtor_max" value="30" step="1"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TEAM & SYNC ============ -->
+  <section class="section" id="team">
+    <div class="card">
+      <h2>Your identity</h2>
+      <p class="hint">Your name is shown to teammates next to edits you make. Stored locally on this device only.</p>
+      <div style="display:flex;gap:10px;align-items:center;max-width:500px">
+        <input type="text" id="userNameInput" placeholder="e.g. Pierre Boncompain">
+        <button onclick="saveUserName()">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Real-time sync (Firebase)</h2>
+      <p class="hint">
+        Paste your Firebase project config below to enable collaborative editing. Both users need to paste the same config.
+        <a href="#" onclick="showFirebaseHelp();return false;">How do I create a Firebase config?</a>
+      </p>
+      <div class="field" style="margin:12px 0">
+        <label>Workspace ID <span class="muted">(shared between teammates)</span></label>
+        <input type="text" id="workspaceId" placeholder="e.g. credit-control-yesss">
+      </div>
+      <div class="field" style="margin:12px 0">
+        <label>Firebase config (JSON)</label>
+        <textarea id="firebaseConfig" rows="8" placeholder='{\n  "apiKey": "AIza...",\n  "authDomain": "your-project.firebaseapp.com",\n  "databaseURL": "https://your-project-default-rtdb.europe-west1.firebasedatabase.app",\n  "projectId": "your-project"\n}'></textarea>
+      </div>
+      <div class="toolbar">
+        <button class="success" onclick="connectFirebase()" id="btnConnect">Connect</button>
+        <button class="ghost" onclick="disconnectFirebase()" id="btnDisconnect" style="display:none">Disconnect</button>
+        <button class="secondary" onclick="clearFirebaseConfig()">Clear config</button>
+        <div class="spacer"></div>
+        <span id="fbStatus" class="badge grey">Not connected</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Currently connected</h2>
+      <div class="presence-list" id="presenceList"><span class="muted">Nobody connected.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent activity</h2>
+      <div class="activity-log" id="activityLog"><div class="muted" style="padding:8px">No activity yet.</div></div>
+    </div>
+  </section>
+
+</main>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+"use strict";
+
+// ============================================================
+// CONFIGURATION & STATE
+// ============================================================
+const LS_KEY = "yesss_kpi_bonus_v3";
+const LS_FB_KEY = "yesss_kpi_firebase_config";
+const LS_WS_KEY = "yesss_kpi_workspace";
+const LS_USER_KEY = "yesss_kpi_user";
+
+const DEFAULT_PARAMS = {
+  inboundMax: 30,
+  outboundTarget: 150,
+  outboundMax: 80,
+  outboundUnderMax: 30,
+  outboundRank1: 30,
+  bdMax: 30,
+  debtorMax: 30,
+};
+
+const state = {
+  currentPeriod: "March 2026",
+  periods: {},
+  lastEdit: null  // { by, at, period, kind }
+};
+
+let userId = localStorage.getItem("kpi_user_id");
+if (!userId) { userId = "u_" + Math.random().toString(36).slice(2, 10); localStorage.setItem("kpi_user_id", userId); }
+let userName = localStorage.getItem(LS_USER_KEY) || "";
+let workspaceId = localStorage.getItem(LS_WS_KEY) || "credit-control-yesss";
+
+let firebaseApp = null;
+let fbDb = null;
+let fbStateRef = null;
+let fbPresenceRef = null;
+let fbActivityRef = null;
+let applyingRemote = false;
+let pushTimer = null;
+let lastPushedAt = 0;
+let isConnected = false;
+
+function emptyPeriod(params) {
+  return {
+    inbound: [], outbound: [], bd: [], debtor: [],
+    params: { ...(params || DEFAULT_PARAMS) },
+    savedAt: null
+  };
+}
+
+function cur() {
+  if (!state.periods[state.currentPeriod]) state.periods[state.currentPeriod] = emptyPeriod();
+  return state.periods[state.currentPeriod];
+}
+
+// ============================================================
+// SEED DATA (March 2026 — from source file)
+// ============================================================
+function seedMarch() {
+  state.periods["March 2026"] = {
+    inbound: [
+      { ext: "10257", name: "Eya Mekki",     callsAnswered: 147, pctServiced: 0.94 },
+      { ext: "10262", name: "Rayen Slama",   callsAnswered: 122, pctServiced: 0.88 },
+      { ext: "10260", name: "Fida Ghabri",   callsAnswered: 105, pctServiced: 0.96 },
+      { ext: "10267", name: "Malek Aoui",    callsAnswered: 84,  pctServiced: 0.98 },
+      { ext: "10266", name: "Fares Ben-Mrad",callsAnswered: 81,  pctServiced: 0.99 },
+      { ext: "10261", name: "Nour Brini",    callsAnswered: 72,  pctServiced: 0.91 },
+    ],
+    outbound: [
+      { ext: "10257", name: "Eya Mekki",     calls: 274 },
+      { ext: "10260", name: "Fida Ghabri",   calls: 271 },
+      { ext: "10262", name: "Rayen Slama",   calls: 188 },
+      { ext: "10261", name: "Nour Brini",    calls: 153 },
+      { ext: "10267", name: "Malek Aoui",    calls: 93  },
+      { ext: "10266", name: "Fares Ben-Mrad",calls: 91  },
+    ],
+    bd: [
+      { name: "Nour",  initial: 94079.22,  final: -9777.26  },
+      { name: "Fida",  initial: 124798.09, final: 18311.47  },
+      { name: "Malek", initial: 514067.28, final: -15096.53 },
+      { name: "Fares", initial: 180410.58, final: -15679.17 },
+      { name: "Eya",   initial: 82148.23,  final: -16704.49 },
+      { name: "Rayen", initial: 190566.88, final: 34558.24  },
+    ],
+    debtor: [
+      { name: "Malek", initial: 93.97, final: 62.90 },
+      { name: "Nour",  initial: 75.66, final: 49.35 },
+      { name: "Rayen", initial: 84.09, final: 58.15 },
+      { name: "Fares", initial: 85.87, final: 60.06 },
+      { name: "Fida",  initial: 81.97, final: 56.68 },
+      { name: "Eya",   initial: 77.25, final: 52.80 },
+    ],
+    params: { ...DEFAULT_PARAMS },
+    savedAt: new Date().toISOString()
+  };
+  state.currentPeriod = "March 2026";
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+const fmt = {
+  num: (v, dec = 2) => v === null || v === undefined || isNaN(v) ? "—" :
+    v.toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec }),
+  pct: (v, dec = 2) => v === null || v === undefined || isNaN(v) ? "—" :
+    (v * 100).toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + "%",
+  money: v => fmt.num(v, 2),
+  date: iso => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  },
+  relTime: ts => {
+    if (!ts) return "—";
+    const diff = Date.now() - (typeof ts === "number" ? ts : new Date(ts).getTime());
+    const s = Math.round(diff/1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.round(s/60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m/60);
+    if (h < 24) return `${h}h ago`;
+    return fmt.date(typeof ts === "number" ? new Date(ts).toISOString() : ts);
+  }
+};
+
+const get = id => document.getElementById(id);
+
+function parseFRNumber(val) {
+  if (val === null || val === undefined || val === "") return 0;
+  if (typeof val === "number") return val;
+  let s = String(val).trim();
+  const isPct = s.includes("%");
+  s = s.replace(/[%\s\u00A0\u202F]/g, "");
+  s = s.replace(/[–—−]/g, "-");
+  s = s.replace(",", ".");
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  return isPct ? n / 100 : n;
+}
+
+function firstNameOf(s) { return s ? String(s).trim().split(/[\s\-]+/)[0] : ""; }
+
+function escapeHTML(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+}
+
+function initials(name) {
+  if (!name) return "?";
+  return name.split(/\s+/).filter(Boolean).slice(0,2).map(s => s[0].toUpperCase()).join("") || "?";
+}
+
+function colorFromId(id) {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360}, 55%, 45%)`;
+}
+
+// ============================================================
+// BUSINESS CALCULATIONS
+// ============================================================
+function computeInbound(period) {
+  const p = period || cur();
+  const max = Math.max(1, ...p.inbound.map(a => a.callsAnswered || 0));
+  return p.inbound.map(a => {
+    const pctVsMax = (a.callsAnswered || 0) / max;
+    const score = ((a.pctServiced || 0) + pctVsMax) / 2;
+    const bonus = score * p.params.inboundMax;
+    return { ...a, pctVsMax, score, bonus };
+  });
+}
+
+function computeOutbound(period) {
+  const p = period || cur();
+  const target = p.params.outboundTarget || 1;
+  const maxCalls = Math.max(0, ...p.outbound.map(a => a.calls || 0));
+  return p.outbound.map(a => {
+    const rateRaw = (a.calls || 0) / target;
+    const reached = rateRaw >= 1;
+    const cappedRate = Math.min(rateRaw, 1);
+    const baseBonus = reached ? p.params.outboundMax : cappedRate * p.params.outboundUnderMax;
+    const isRank1 = (a.calls || 0) === maxCalls && maxCalls > 0;
+    const rankBonus = isRank1 ? p.params.outboundRank1 : 0;
+    return { ...a, rate: cappedRate, reached, baseBonus, isRank1, rankBonus, bonus: baseBonus + rankBonus };
+  });
+}
+
+function computeBD(period) {
+  const p = period || cur();
+  return p.bd.map(a => {
+    const init = a.initial || 0;
+    const fin = a.final;
+    let rate, status;
+    if (fin <= 0) { rate = 1; status = "Credit / zero"; }
+    else if (init <= 0) { rate = 0; status = "Charge"; }
+    else { rate = Math.max(0, (init - fin) / init); status = "Charge"; }
+    const bonus = rate * p.params.bdMax;
+    return { ...a, rate, status, bonus };
+  });
+}
+
+function computeDebtor(period) {
+  const p = period || cur();
+  const reductions = p.debtor.map(a => (a.initial || 0) - (a.final || 0));
+  const maxRed = Math.max(1e-9, ...reductions);
+  return p.debtor.map((a, i) => {
+    const reduction = reductions[i];
+    const rate = reduction / maxRed;
+    const bonus = Math.max(0, rate) * p.params.debtorMax;
+    return { ...a, reduction, rate, bonus };
+  });
+}
+
+function computeSummary(period) {
+  const inb = computeInbound(period);
+  const out = computeOutbound(period);
+  const bd = computeBD(period);
+  const dd = computeDebtor(period);
+  const map = new Map();
+  function add(kpi, rows, keyFn) {
+    rows.forEach(r => {
+      const key = firstNameOf(keyFn(r));
+      if (!key) return;
+      if (!map.has(key)) map.set(key, { key, displayName: key, bd: 0, outbound: 0, debtor: 0, inbound: 0, rank1: 0 });
+      const e = map.get(key);
+      if (kpi === "inbound") { e.inbound = r.bonus; e.displayName = r.name || e.displayName; }
+      if (kpi === "outbound") { e.outbound = r.baseBonus; e.rank1 = r.rankBonus; e.displayName = r.name || e.displayName; }
+      if (kpi === "bd") { e.bd = r.bonus; }
+      if (kpi === "debtor") { e.debtor = r.bonus; }
+    });
+  }
+  add("inbound", inb, r => r.name);
+  add("outbound", out, r => r.name);
+  add("bd", bd, r => r.name);
+  add("debtor", dd, r => r.name);
+  const agents = [...map.values()].map(a => ({
+    ...a, total: (a.bd||0)+(a.outbound||0)+(a.debtor||0)+(a.inbound||0)+(a.rank1||0)
+  }));
+  agents.sort((a,b) => b.total - a.total);
+  return agents;
+}
+
+// ============================================================
+// RENDER — KPI TABLES
+// ============================================================
+function renderInbound() {
+  const rows = computeInbound();
+  get("inboundBody").innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHTML(r.ext || "")}" onchange="updateField('inbound',${i},'ext',this.value)"></td>
+      <td><input type="text" value="${escapeHTML(r.name || "")}" onchange="updateField('inbound',${i},'name',this.value)"></td>
+      <td><input type="number" value="${r.callsAnswered}" step="1" min="0" onchange="updateField('inbound',${i},'callsAnswered',this.value)"></td>
+      <td><input type="number" value="${(r.pctServiced * 100).toFixed(2)}" step="0.1" min="0" max="100" onchange="updateField('inbound',${i},'pctServiced',this.value/100)"><span class="hint" style="display:block;margin-top:2px">enter as %</span></td>
+      <td class="num"><span class="computed">${fmt.pct(r.pctVsMax, 1)}</span></td>
+      <td class="num"><span class="computed">${fmt.pct(r.score, 2)}</span></td>
+      <td class="bonus-cell">${fmt.money(r.bonus)}</td>
+      <td><button class="delete-btn small" onclick="deleteRow('inbound',${i})" title="Delete">✕</button></td>
+    </tr>
+  `).join("") || emptyRow(8);
+}
+
+function renderOutbound() {
+  const rows = computeOutbound();
+  get("outboundBody").innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHTML(r.ext || "")}" onchange="updateField('outbound',${i},'ext',this.value)"></td>
+      <td><input type="text" value="${escapeHTML(r.name || "")}" onchange="updateField('outbound',${i},'name',this.value)"></td>
+      <td><input type="number" value="${r.calls}" step="1" min="0" onchange="updateField('outbound',${i},'calls',this.value)"></td>
+      <td class="num"><span class="computed">${fmt.pct(r.rate, 2)}${r.reached?' ✓':''}</span></td>
+      <td class="num"><span class="computed">${fmt.money(r.baseBonus)}</span></td>
+      <td class="num">${r.isRank1 ? `<span class="badge gold">RANK 1 · ${fmt.money(r.rankBonus)}</span>` : `<span class="computed">—</span>`}</td>
+      <td class="bonus-cell">${fmt.money(r.bonus)}</td>
+      <td><button class="delete-btn small" onclick="deleteRow('outbound',${i})" title="Delete">✕</button></td>
+    </tr>
+  `).join("") || emptyRow(8);
+}
+
+function renderBD() {
+  const rows = computeBD();
+  get("bdBody").innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHTML(r.name || "")}" onchange="updateField('bd',${i},'name',this.value)"></td>
+      <td><input type="number" value="${r.initial}" step="0.01" onchange="updateField('bd',${i},'initial',this.value)"></td>
+      <td><input type="number" value="${r.final}" step="0.01" onchange="updateField('bd',${i},'final',this.value)"></td>
+      <td>${r.final <= 0 ? `<span class="badge green">Credit</span>` : `<span class="badge red">Charge</span>`}</td>
+      <td class="num"><span class="computed">${fmt.pct(r.rate, 2)}</span></td>
+      <td class="bonus-cell">${fmt.money(r.bonus)}</td>
+      <td><button class="delete-btn small" onclick="deleteRow('bd',${i})" title="Delete">✕</button></td>
+    </tr>
+  `).join("") || emptyRow(7);
+}
+
+function renderDebtor() {
+  const rows = computeDebtor();
+  get("debtorBody").innerHTML = rows.map((r, i) => `
+    <tr>
+      <td><input type="text" value="${escapeHTML(r.name || "")}" onchange="updateField('debtor',${i},'name',this.value)"></td>
+      <td><input type="number" value="${r.initial}" step="0.01" onchange="updateField('debtor',${i},'initial',this.value)"></td>
+      <td><input type="number" value="${r.final}" step="0.01" onchange="updateField('debtor',${i},'final',this.value)"></td>
+      <td class="num"><span class="computed">${fmt.num(r.reduction, 2)}</span></td>
+      <td class="num"><span class="computed">${fmt.pct(r.rate, 2)}</span></td>
+      <td class="bonus-cell">${fmt.money(r.bonus)}</td>
+      <td><button class="delete-btn small" onclick="deleteRow('debtor',${i})" title="Delete">✕</button></td>
+    </tr>
+  `).join("") || emptyRow(7);
+}
+
+function emptyRow(cols) {
+  return `<tr><td colspan="${cols}" class="empty-state" style="padding:24px">No rows yet. Click + Add row or import an Excel file.</td></tr>`;
+}
+
+// ============================================================
+// RENDER — SUMMARY & DEPT BANNER
+// ============================================================
+function renderSummary() {
+  const agents = computeSummary();
+  const body = get("summaryBody");
+  body.innerHTML = agents.map(a => `
+    <tr class="clickable" onclick="openAgentDrilldown('${escapeHTML(a.key).replace(/'/g,"&#39;")}')">
+      <td class="agent-col"><strong>${escapeHTML(a.displayName)}</strong></td>
+      <td class="num">${fmt.money(a.bd)}</td>
+      <td class="num">${fmt.money(a.outbound)}</td>
+      <td class="num">${fmt.money(a.debtor)}</td>
+      <td class="num">${fmt.money(a.inbound)}</td>
+      <td class="num">${a.rank1 ? fmt.money(a.rank1) : "—"}</td>
+      <td class="num bonus-cell" style="font-size:14px">${fmt.money(a.total)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px">No data. Import an Excel file or create a new period.</td></tr>`;
+
+  const sum = k => agents.reduce((s,a) => s + (a[k] || 0), 0);
+  const totals = { bd: sum("bd"), outbound: sum("outbound"), debtor: sum("debtor"),
+                   inbound: sum("inbound"), rank1: sum("rank1"), total: sum("total") };
+  get("summaryFoot").innerHTML = agents.length ? `
+    <tr class="total-row">
+      <td>TEAM TOTAL</td>
+      <td class="num">${fmt.money(totals.bd)}</td>
+      <td class="num">${fmt.money(totals.outbound)}</td>
+      <td class="num">${fmt.money(totals.debtor)}</td>
+      <td class="num">${fmt.money(totals.inbound)}</td>
+      <td class="num">${fmt.money(totals.rank1)}</td>
+      <td class="num">${fmt.money(totals.total)}</td>
+    </tr>` : "";
+
+  get("statPeriod").textContent = state.currentPeriod;
+  get("statAgents").textContent = agents.length;
+  get("statTotal").textContent = fmt.money(totals.total);
+  get("statAvg").textContent = fmt.money(agents.length ? totals.total/agents.length : 0);
+  get("statMax").textContent = fmt.money(agents.length ? Math.max(...agents.map(a => a.total)) : 0);
+
+  // Department banner
+  get("deptCount").textContent = Math.max(7, agents.length); // at least 7 per briefing
+  get("deptPeriod").textContent = state.currentPeriod;
+  get("deptTotal").textContent = fmt.money(totals.total);
+  get("deptAvg").textContent = fmt.money(agents.length ? totals.total/agents.length : 0);
+
+  // Last edit label
+  if (state.lastEdit && state.lastEdit.by) {
+    get("lastEditLabel").textContent = `Last edit by ${state.lastEdit.by} · ${fmt.relTime(state.lastEdit.at)}`;
+  } else {
+    get("lastEditLabel").textContent = "";
+  }
+}
+
+// ============================================================
+// PERIOD SELECTOR
+// ============================================================
+function sortedPeriodKeys() {
+  return Object.keys(state.periods).sort((a, b) => {
+    const da = state.periods[a].savedAt, db = state.periods[b].savedAt;
+    if (da && db) return db.localeCompare(da);
+    return a.localeCompare(b);
+  });
+}
+
+function renderPeriodSelect() {
+  const sel = get("periodSelect");
+  const keys = sortedPeriodKeys();
+  sel.innerHTML = keys.map(k => `<option value="${escapeHTML(k)}"${k===state.currentPeriod?' selected':''}>${escapeHTML(k)}</option>`).join("");
+}
+
+function switchPeriod(label) {
+  if (!state.periods[label]) state.periods[label] = emptyPeriod();
+  state.currentPeriod = label;
+  bindParams();
+  renderAll();
+  markEdit("switched period to " + label, false);
+}
+
+// ============================================================
+// NEW PERIOD
+// ============================================================
+function openNewPeriodModal() {
+  showModal(`
+    <h3>Create a new period</h3>
+    <div class="field">
+      <label>Period label</label>
+      <input type="text" id="newPeriodName" placeholder="e.g. April 2026" value="${escapeHTML(suggestNextPeriod())}">
+    </div>
+    <div class="field">
+      <label>Starting point</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <label><input type="radio" name="startFrom" value="empty" checked> Empty</label>
+        <label><input type="radio" name="startFrom" value="agents"> Copy employees from "${escapeHTML(state.currentPeriod)}" (zero values)</label>
+        <label><input type="radio" name="startFrom" value="full"> Duplicate "${escapeHTML(state.currentPeriod)}"</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+      <button onclick="createNewPeriod()">Create</button>
+    </div>
+  `);
+  setTimeout(() => get("newPeriodName").focus(), 50);
+}
+
+function createNewPeriod() {
+  const name = get("newPeriodName").value.trim();
+  if (!name) { alert("Label required."); return; }
+  if (state.periods[name] && !confirm(`Period "${name}" already exists. Overwrite?`)) return;
+  const startFrom = [...document.getElementsByName("startFrom")].find(r => r.checked).value;
+  const src = state.periods[state.currentPeriod];
+  let np;
+  if (startFrom === "empty") np = emptyPeriod(src?.params);
+  else if (startFrom === "agents" && src) {
+    np = emptyPeriod(src.params);
+    np.inbound = src.inbound.map(a => ({ ext: a.ext, name: a.name, callsAnswered: 0, pctServiced: 0 }));
+    np.outbound = src.outbound.map(a => ({ ext: a.ext, name: a.name, calls: 0 }));
+    np.bd = src.bd.map(a => ({ name: a.name, initial: 0, final: 0 }));
+    np.debtor = src.debtor.map(a => ({ name: a.name, initial: 0, final: 0 }));
+  } else if (startFrom === "full" && src) {
+    np = JSON.parse(JSON.stringify(src));
+  } else np = emptyPeriod();
+  np.savedAt = new Date().toISOString();
+  state.periods[name] = np;
+  state.currentPeriod = name;
+  closeModal();
+  markEdit("created period " + name);
+  renderAll();
+}
+
+function suggestNextPeriod() {
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const parts = (state.currentPeriod||"").split(/\s+/);
+  const mIdx = months.findIndex(m => m.toLowerCase() === (parts[0]||"").toLowerCase());
+  const year = parseInt(parts[1]);
+  if (mIdx < 0 || isNaN(year)) {
+    const n = new Date();
+    return `${months[n.getMonth()]} ${n.getFullYear()}`;
+  }
+  let nm = mIdx+1, ny = year;
+  if (nm > 11) { nm = 0; ny++; }
+  return `${months[nm]} ${ny}`;
+}
+
+// ============================================================
+// EXCEL IMPORT
+// ============================================================
+function importExcel(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array", cellDates: false });
+      const parsed = parseWorkbook(wb);
+      showImportPreview(parsed, file.name);
+    } catch (err) { alert("Read error: " + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(wb) {
+  const findSheet = patterns => {
+    for (const sn of wb.SheetNames) {
+      const norm = sn.toLowerCase().trim();
+      for (const p of patterns) if (norm.includes(p.toLowerCase())) return wb.Sheets[sn];
+    }
+    return null;
+  };
+  const shIn  = findSheet(["inbound"]);
+  const shOut = findSheet(["outbound"]);
+  const shBD  = findSheet(["b&d","b et d","b & d","bd"]);
+  const shDD  = findSheet(["debtor"]);
+  const result = { inbound: [], outbound: [], bd: [], debtor: [], suggestedLabel: "" };
+
+  for (const sn of wb.SheetNames) {
+    const m = sn.match(/bonus\s+(.+)/i);
+    if (m) { result.suggestedLabel = normalizeMonthLabel(m[1].trim()); break; }
+  }
+
+  const kpi = (sh, fields) => {
+    if (!sh) return [];
+    const rows = XLSX.utils.sheet_to_json(sh, { header: 1, defval: "" });
+    const out = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i]; if (!r || !r.length) continue;
+      const rec = {};
+      for (const [key, col, type] of fields) {
+        rec[key] = type === "num" ? parseFRNumber(r[col]) :
+                   type === "int" ? Math.round(parseFRNumber(r[col])) :
+                   String(r[col]||"").trim();
+      }
+      if (!rec.name && !rec.ext) continue;
+      out.push(rec);
+    }
+    return out;
+  };
+
+  result.inbound = kpi(shIn, [["ext",0],["name",1],["callsAnswered",2,"int"],["pctServiced",3,"num"]]);
+  result.outbound = kpi(shOut, [["ext",0],["name",1],["calls",2,"int"]]);
+  result.bd = kpi(shBD, [["name",0],["initial",1,"num"],["final",2,"num"]]);
+  result.debtor = kpi(shDD, [["name",0],["initial",1,"num"],["final",2,"num"]]);
+  return result;
+}
+
+function normalizeMonthLabel(raw) {
+  const fr2en = {
+    janvier:"January", "février":"February", fevrier:"February", mars:"March", avril:"April", mai:"May", juin:"June",
+    juillet:"July", aout:"August", "août":"August", septembre:"September", octobre:"October", novembre:"November", "décembre":"December", decembre:"December"
+  };
+  const parts = raw.split(/\s+/);
+  const key = (parts[0]||"").toLowerCase();
+  let month = fr2en[key] || (parts[0] ? parts[0][0].toUpperCase() + parts[0].slice(1).toLowerCase() : "");
+  const yr = parts[1] && /^\d{4}$/.test(parts[1]) ? parts[1] : new Date().getFullYear();
+  return `${month} ${yr}`.trim();
+}
+
+function showImportPreview(parsed, fileName) {
+  const c = { inbound: parsed.inbound.length, outbound: parsed.outbound.length, bd: parsed.bd.length, debtor: parsed.debtor.length };
+  const total = c.inbound + c.outbound + c.bd + c.debtor;
+  if (total === 0) { alert("No data recognised. The file must contain sheets INBOUND / OUTBOUND / B&D / Debtor Days."); return; }
+  const suggested = parsed.suggestedLabel || suggestNextPeriod();
+  const exists = !!state.periods[suggested];
+  showModal(`
+    <h3>Import from ${escapeHTML(fileName)}</h3>
+    <div style="background:#f8fafc;border:1px dashed var(--border);border-radius:6px;padding:12px;margin:12px 0;font-size:12px">
+      <div><strong>Inbound</strong>: ${c.inbound} employees</div>
+      <div><strong>Outbound</strong>: ${c.outbound} employees</div>
+      <div><strong>B&amp;D</strong>: ${c.bd} employees</div>
+      <div><strong>Debtor Days</strong>: ${c.debtor} employees</div>
+    </div>
+    <div class="field">
+      <label>Period label</label>
+      <input type="text" id="importPeriodName" value="${escapeHTML(suggested)}">
+      ${exists ? `<div class="hint" style="color:var(--warn)">⚠ This period already exists — it will be replaced.</div>` : ""}
+    </div>
+    <div class="actions">
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+      <button onclick='confirmImport(${JSON.stringify(parsed).replace(/'/g, "&#39;")})'>Import</button>
+    </div>
+  `);
+  setTimeout(() => get("importPeriodName").focus(), 50);
+}
+
+function confirmImport(parsed) {
+  const name = get("importPeriodName").value.trim();
+  if (!name) { alert("Label required."); return; }
+  const params = state.periods[state.currentPeriod]?.params || { ...DEFAULT_PARAMS };
+  state.periods[name] = {
+    inbound: parsed.inbound, outbound: parsed.outbound, bd: parsed.bd, debtor: parsed.debtor,
+    params: { ...params }, savedAt: new Date().toISOString()
+  };
+  state.currentPeriod = name;
+  closeModal();
+  markEdit("imported period " + name);
+  renderAll();
+  setActiveTab("dashboard");
+}
+
+// ============================================================
+// CRUD
+// ============================================================
+function updateField(kpi, i, field, value) {
+  const numFields = {
+    inbound: ["callsAnswered","pctServiced"], outbound: ["calls"],
+    bd: ["initial","final"], debtor: ["initial","final"]
+  };
+  const c = cur();
+  if (numFields[kpi]?.includes(field)) c[kpi][i][field] = parseFRNumber(value);
+  else c[kpi][i][field] = value;
+  c.savedAt = new Date().toISOString();
+  markEdit(`edited ${kpi} · ${field}`);
+  renderAll();
+}
+function deleteRow(kpi, i) {
+  cur()[kpi].splice(i, 1);
+  cur().savedAt = new Date().toISOString();
+  markEdit(`deleted ${kpi} row`);
+  renderAll();
+}
+function addAgent(kpi) {
+  const templates = {
+    inbound: { ext: "", name: "New employee", callsAnswered: 0, pctServiced: 0 },
+    outbound: { ext: "", name: "New employee", calls: 0 },
+    bd: { name: "New employee", initial: 0, final: 0 },
+    debtor: { name: "New employee", initial: 0, final: 0 }
+  };
+  cur()[kpi].push({ ...templates[kpi] });
+  cur().savedAt = new Date().toISOString();
+  markEdit(`added ${kpi} row`);
+  renderAll();
+}
+
+// ============================================================
+// PARAMETERS
+// ============================================================
+function bindParams() {
+  const ids = [
+    ["p_inbound_max","inboundMax"], ["p_outbound_target","outboundTarget"],
+    ["p_outbound_max","outboundMax"], ["p_outbound_under","outboundUnderMax"],
+    ["p_outbound_rank1","outboundRank1"], ["p_bd_max","bdMax"], ["p_debtor_max","debtorMax"]
+  ];
+  const p = cur().params;
+  ids.forEach(([id, key]) => {
+    const el = get(id); if (!el) return;
+    el.value = p[key];
+    el.oninput = () => {
+      cur().params[key] = parseFRNumber(el.value);
+      cur().savedAt = new Date().toISOString();
+      markEdit(`changed parameter ${key}`);
+      updateFormulaLabels();
+      renderAll();
+    };
+  });
+  updateFormulaLabels();
+}
+
+function updateFormulaLabels() {
+  const p = cur().params;
+  document.querySelectorAll(".pk-inbound").forEach(e => e.textContent = p.inboundMax);
+  document.querySelectorAll(".pk-outbound").forEach(e => e.textContent = p.outboundMax);
+  document.querySelectorAll(".pk-outbound-under").forEach(e => e.textContent = p.outboundUnderMax);
+  document.querySelectorAll(".pk-outbound-rank").forEach(e => e.textContent = p.outboundRank1);
+  document.querySelectorAll(".pk-outbound-target").forEach(e => e.textContent = p.outboundTarget);
+  document.querySelectorAll(".pk-bd").forEach(e => e.textContent = p.bdMax);
+  document.querySelectorAll(".pk-debtor").forEach(e => e.textContent = p.debtorMax);
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function renderHistory() {
+  const keys = sortedPeriodKeys();
+  get("periodsBody").innerHTML = keys.map(k => {
+    const p = state.periods[k];
+    const agents = computeSummary(p);
+    const total = agents.reduce((s,a) => s+a.total, 0);
+    const avg = agents.length ? total/agents.length : 0;
+    const max = agents.length ? Math.max(...agents.map(a => a.total)) : 0;
+    const active = k === state.currentPeriod;
+    const safeK = escapeHTML(k).replace(/'/g,"&#39;");
+    return `
+      <tr class="clickable" onclick="switchPeriod('${safeK}');setActiveTab('dashboard')">
+        <td><strong>${escapeHTML(k)}</strong> ${active ? '<span class="badge blue">active</span>' : ''}</td>
+        <td class="num">${agents.length}</td>
+        <td class="num">${fmt.money(total)}</td>
+        <td class="num">${fmt.money(avg)}</td>
+        <td class="num">${fmt.money(max)}</td>
+        <td>${fmt.date(p.savedAt)}</td>
+        <td>
+          <button class="small ghost" onclick="event.stopPropagation();duplicatePeriod('${safeK}')">Copy</button>
+          <button class="small danger" onclick="event.stopPropagation();deletePeriod('${safeK}')">Delete</button>
+        </td>
+      </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty-state">No period recorded yet.</td></tr>`;
+  renderChartTotal(keys);
+  renderHeatmap(keys);
+}
+
+function renderChartTotal(keys) {
+  const data = keys.map(k => ({ k, total: computeSummary(state.periods[k]).reduce((s,a)=>s+a.total,0) })).reverse();
+  if (!data.length) { get("chartTotal").innerHTML = '<div class="empty-state">No periods yet.</div>'; return; }
+  const W=900, H=260, padL=60, padR=20, padT=20, padB=60;
+  const maxVal = Math.max(1, ...data.map(d => d.total));
+  const gap = (W-padL-padR) / data.length;
+  const barW = gap * 0.65;
+  const bars = data.map((d,i) => {
+    const x = padL + i*gap + (gap-barW)/2;
+    const h = (H-padT-padB) * (d.total/maxVal);
+    const y = H-padB-h;
+    const safeK = escapeHTML(d.k).replace(/'/g,"&#39;");
+    return `
+      <g>
+        <rect class="bar" x="${x}" y="${y}" width="${barW}" height="${h}" onclick="switchPeriod('${safeK}');setActiveTab('dashboard')">
+          <title>${escapeHTML(d.k)} — ${fmt.money(d.total)} DT</title>
+        </rect>
+        <text class="value-label" x="${x+barW/2}" y="${y-4}" text-anchor="middle">${fmt.num(d.total,0)}</text>
+        <text class="label" x="${x+barW/2}" y="${H-padB+18}" text-anchor="middle" transform="rotate(-20, ${x+barW/2}, ${H-padB+18})">${escapeHTML(d.k)}</text>
+      </g>`;
+  }).join("");
+  const ticks = 4;
+  const grid = [...Array(ticks+1)].map((_,i) => {
+    const v = maxVal * i/ticks;
+    const y = H-padB - (H-padT-padB)*(i/ticks);
+    return `<line class="axis" x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}"/><text class="label" x="${padL-8}" y="${y+3}" text-anchor="end">${fmt.num(v,0)}</text>`;
+  }).join("");
+  get("chartTotal").innerHTML = `<svg class="bar-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grid}${bars}</svg>`;
+}
+
+function renderHeatmap(keys) {
+  const periods = keys.slice().reverse();
+  const agentMap = new Map();
+  periods.forEach(k => computeSummary(state.periods[k]).forEach(a => { if (!agentMap.has(a.key)) agentMap.set(a.key, a.displayName); }));
+  if (!agentMap.size) { get("heatmapHead").innerHTML = ""; get("heatmapBody").innerHTML = ""; return; }
+  const matrix = {};
+  let maxCell = 0;
+  for (const [key] of agentMap.entries()) {
+    matrix[key] = {};
+    for (const pk of periods) {
+      const ag = computeSummary(state.periods[pk]).find(a => a.key === key);
+      const v = ag ? ag.total : 0;
+      matrix[key][pk] = v;
+      if (v > maxCell) maxCell = v;
+    }
+  }
+  get("heatmapHead").innerHTML = `
+    <tr><th>Employee</th>${periods.map(p => `<th class="num">${escapeHTML(p)}</th>`).join("")}<th class="num">Average</th><th class="num">Cumulative</th></tr>`;
+  const rows = [...agentMap.entries()].map(([key, name]) => {
+    const vals = periods.map(p => matrix[key][p]);
+    const nz = vals.filter(v => v > 0);
+    const avg = nz.length ? nz.reduce((s,x)=>s+x,0)/nz.length : 0;
+    const sum = vals.reduce((s,x)=>s+x,0);
+    return { key, name, vals, avg, sum };
+  }).sort((a,b) => b.sum - a.sum);
+  get("heatmapBody").innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${escapeHTML(r.name)}</strong></td>
+      ${r.vals.map((v,i) => {
+        if (v === 0) return `<td class="heat muted">—</td>`;
+        const alpha = Math.min(1, v/maxCell);
+        const bg = `rgba(34,197,94,${0.1 + alpha*0.45})`;
+        const safeP = escapeHTML(periods[i]).replace(/'/g,"&#39;");
+        return `<td class="heat" style="background:${bg}" onclick="switchPeriod('${safeP}');setActiveTab('dashboard')">${fmt.money(v)}</td>`;
+      }).join("")}
+      <td class="heat" style="font-weight:600">${fmt.money(r.avg)}</td>
+      <td class="heat" style="font-weight:700;background:#dbeafe">${fmt.money(r.sum)}</td>
+    </tr>`).join("");
+}
+
+// ============================================================
+// AGENT DRILL-DOWN
+// ============================================================
+function openAgentDrilldown(key) {
+  const keys = sortedPeriodKeys().slice().reverse();
+  const rows = keys.map(k => ({ period: k, data: computeSummary(state.periods[k]).find(a => a.key === key) }));
+  const name = rows.find(r => r.data)?.data.displayName || key;
+  const line = (a,k) => a ? `
+    <tr>
+      <td>${escapeHTML(k)}</td>
+      <td class="num">${fmt.money(a.bd)}</td>
+      <td class="num">${fmt.money(a.outbound)}</td>
+      <td class="num">${fmt.money(a.debtor)}</td>
+      <td class="num">${fmt.money(a.inbound)}</td>
+      <td class="num">${a.rank1 ? fmt.money(a.rank1) : "—"}</td>
+      <td class="num bonus-cell">${fmt.money(a.total)}</td>
+    </tr>` : `<tr><td>${escapeHTML(k)}</td><td colspan="6" class="muted" style="text-align:center">— not present —</td></tr>`;
+  const sums = { bd:0, outbound:0, debtor:0, inbound:0, rank1:0, total:0, n:0 };
+  rows.forEach(r => { if (r.data) { Object.keys(sums).forEach(k => { if (k !== "n") sums[k] += r.data[k]||0; }); sums.n++; } });
+  const avg = sums.n ? sums.total/sums.n : 0;
+  showModal(`
+    <h3>History of ${escapeHTML(name)}</h3>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div class="stat-card" style="flex:1"><div class="label">Periods</div><div class="value">${sums.n}</div></div>
+      <div class="stat-card" style="flex:1"><div class="label">Average</div><div class="value"><span>${fmt.money(avg)}</span> <small>DT</small></div></div>
+      <div class="stat-card" style="flex:1"><div class="label">Cumulative</div><div class="value"><span>${fmt.money(sums.total)}</span> <small>DT</small></div></div>
+    </div>
+    <div style="max-height:340px;overflow:auto">
+      <table>
+        <thead><tr><th>Period</th><th class="num">B&amp;D</th><th class="num">OUT</th><th class="num">DD</th><th class="num">IN</th><th class="num">R1</th><th class="num">TOTAL</th></tr></thead>
+        <tbody>${rows.map(r => line(r.data, r.period)).join("")}</tbody>
+      </table>
+    </div>
+    <div class="actions"><button onclick="closeModal()">Close</button></div>
+  `, 700);
+}
+
+// ============================================================
+// DUPLICATE / DELETE
+// ============================================================
+function duplicatePeriod(k) {
+  const newName = prompt(`Name of the copy of "${k}"?`, `${k} (copy)`);
+  if (!newName) return;
+  if (state.periods[newName] && !confirm(`"${newName}" exists. Overwrite?`)) return;
+  state.periods[newName] = JSON.parse(JSON.stringify(state.periods[k]));
+  state.periods[newName].savedAt = new Date().toISOString();
+  markEdit(`duplicated ${k} → ${newName}`);
+  renderAll();
+}
+
+function deletePeriod(k) {
+  if (!confirm(`Permanently delete "${k}"?`)) return;
+  delete state.periods[k];
+  if (state.currentPeriod === k) {
+    const remaining = Object.keys(state.periods);
+    state.currentPeriod = remaining[0] || "New month";
+    if (!remaining.length) state.periods[state.currentPeriod] = emptyPeriod();
+  }
+  markEdit(`deleted period ${k}`);
+  renderAll();
+}
+
+function resetCurrent() {
+  if (!confirm(`Clear all data for "${state.currentPeriod}"?`)) return;
+  state.periods[state.currentPeriod] = emptyPeriod(state.periods[state.currentPeriod]?.params);
+  markEdit(`reset period ${state.currentPeriod}`);
+  renderAll();
+}
+
+// ============================================================
+// EDIT TRACKING
+// ============================================================
+function markEdit(description, push = true) {
+  state.lastEdit = {
+    by: userName || "Anonymous",
+    byId: userId,
+    at: Date.now(),
+    period: state.currentPeriod,
+    what: description
+  };
+  if (push) schedulePush();
+}
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+function autoSave() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { console.warn("localStorage:", e.message); }
+}
+
+function loadFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s || !s.periods) return false;
+    state.currentPeriod = s.currentPeriod || Object.keys(s.periods)[0];
+    state.periods = s.periods;
+    state.lastEdit = s.lastEdit || null;
+    Object.values(state.periods).forEach(p => { p.params = { ...DEFAULT_PARAMS, ...(p.params||{}) }; });
+    return true;
+  } catch (e) { console.warn("localStorage read:", e.message); return false; }
+}
+
+function saveStateJSON() {
+  const data = { ...state, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `KPI_Bonus_History_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadStateJSON(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const s = JSON.parse(e.target.result);
+      if (s.periods) {
+        if (!confirm("Replace current history with the uploaded file?")) return;
+        state.periods = s.periods;
+        state.currentPeriod = s.currentPeriod || Object.keys(s.periods)[0];
+        state.lastEdit = s.lastEdit || null;
+        Object.values(state.periods).forEach(p => { p.params = { ...DEFAULT_PARAMS, ...(p.params||{}) }; });
+      }
+      markEdit("restored from JSON");
+      renderAll();
+    } catch (err) { alert("Error: " + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+// EXPORT CSV / XLSX
+// ============================================================
+function exportCSV() {
+  const agents = computeSummary();
+  const period = state.currentPeriod;
+  const rows = [
+    ["Period", period], [],
+    ["Employee","B&D (DT)","Outbound (DT)","Debtor Days (DT)","Inbound (DT)","Rank 1 OB (DT)","TOTAL (DT)"]
+  ];
+  agents.forEach(a => rows.push([a.displayName, a.bd.toFixed(2), a.outbound.toFixed(2), a.debtor.toFixed(2), a.inbound.toFixed(2), a.rank1.toFixed(2), a.total.toFixed(2)]));
+  const sum = k => agents.reduce((s,a) => s+(a[k]||0), 0);
+  rows.push(["TEAM TOTAL", sum("bd").toFixed(2), sum("outbound").toFixed(2), sum("debtor").toFixed(2), sum("inbound").toFixed(2), sum("rank1").toFixed(2), sum("total").toFixed(2)]);
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c ?? "");
+    return /[,;"\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(";")).join("\n");
+  downloadBlob(["\ufeff"+csv], "text/csv;charset=utf-8", `Bonus_${slug(period)}.csv`);
+}
+
+function exportXLSX() {
+  const wb = XLSX.utils.book_new();
+  const agents = computeSummary();
+  const head = ["Employee","B&D (DT)","Outbound (DT)","Debtor Days (DT)","Inbound (DT)","Rank 1 OB (DT)","TOTAL (DT)"];
+  const rows = agents.map(a => [a.displayName, a.bd, a.outbound, a.debtor, a.inbound, a.rank1, a.total]);
+  const sum = k => agents.reduce((s,a)=>s+(a[k]||0),0);
+  rows.push(["TEAM TOTAL", sum("bd"), sum("outbound"), sum("debtor"), sum("inbound"), sum("rank1"), sum("total")]);
+  const ws1 = XLSX.utils.aoa_to_sheet([["Period", state.currentPeriod], [], head, ...rows]);
+  XLSX.utils.book_append_sheet(wb, ws1, "Summary");
+
+  const keys = sortedPeriodKeys().slice().reverse();
+  const keySet = new Set();
+  keys.forEach(k => computeSummary(state.periods[k]).forEach(a => keySet.add(a.key)));
+  const histHead = ["Employee", ...keys, "Average","Cumulative"];
+  const histRows = [];
+  keySet.forEach(key => {
+    const vals = keys.map(k => { const a = computeSummary(state.periods[k]).find(x => x.key === key); return a ? a.total : 0; });
+    const nz = vals.filter(v => v > 0);
+    const name = (() => { for (const k of keys) { const a = computeSummary(state.periods[k]).find(x => x.key === key); if (a) return a.displayName; } return key; })();
+    histRows.push([name, ...vals, nz.length?nz.reduce((s,x)=>s+x,0)/nz.length:0, vals.reduce((s,x)=>s+x,0)]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet([histHead, ...histRows]);
+  XLSX.utils.book_append_sheet(wb, ws2, "History");
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  downloadBlob([buf], "application/octet-stream", `KPI_Bonus_${slug(state.currentPeriod)}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function downloadBlob(parts, mime, name) {
+  const url = URL.createObjectURL(new Blob(parts, { type: mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+function slug(s) { return String(s||"export").replace(/[^a-zA-Z0-9]+/g, "_"); }
+
+// ============================================================
+// FIREBASE REAL-TIME SYNC
+// ============================================================
+function saveUserName() {
+  const n = get("userNameInput").value.trim();
+  if (!n) { alert("Please enter your name."); return; }
+  userName = n;
+  localStorage.setItem(LS_USER_KEY, n);
+  updatePresenceSelf();
+  showToast("Name saved", "success");
+  renderTeam();
+}
+
+function clearFirebaseConfig() {
+  if (!confirm("Clear Firebase config and disconnect?")) return;
+  localStorage.removeItem(LS_FB_KEY);
+  get("firebaseConfig").value = "";
+  disconnectFirebase();
+}
+
+function connectFirebase() {
+  if (!userName) {
+    if (!confirm("You haven't set your name yet — you'll appear as 'Anonymous'. Continue?")) return;
+    userName = "Anonymous";
+  }
+  const wsIn = get("workspaceId").value.trim() || "credit-control-yesss";
+  workspaceId = wsIn;
+  localStorage.setItem(LS_WS_KEY, workspaceId);
+
+  let config;
+  try {
+    const raw = get("firebaseConfig").value.trim();
+    if (!raw) { alert("Please paste your Firebase config first."); return; }
+    config = JSON.parse(raw);
+  } catch (e) { alert("Invalid JSON: " + e.message); return; }
+
+  localStorage.setItem(LS_FB_KEY, JSON.stringify(config));
+
+  try {
+    if (firebaseApp) { try { firebaseApp.delete(); } catch (_) {} }
+    firebaseApp = firebase.initializeApp(config, "kpi-" + Date.now());
+    fbDb = firebaseApp.database();
+    fbStateRef = fbDb.ref(`kpiBonus/${workspaceId}/state`);
+    fbPresenceRef = fbDb.ref(`kpiBonus/${workspaceId}/presence`);
+    fbActivityRef = fbDb.ref(`kpiBonus/${workspaceId}/activity`);
+
+    // Merge remote state with local first time
+    fbStateRef.once("value").then(snap => {
+      const remote = snap.val();
+      if (remote && remote.periods && Object.keys(remote.periods).length) {
+        // Ask user: replace local or push local?
+        const choice = confirm(`Remote workspace "${workspaceId}" has ${Object.keys(remote.periods).length} period(s).\n\nOK = Load remote (replace local).\nCancel = Push local to remote (replace remote).`);
+        if (choice) {
+          applyRemoteState(remote);
+          showToast("Loaded from remote", "success");
+        } else {
+          pushToRemote();
+          showToast("Local state pushed to remote", "success");
+        }
+      } else {
+        pushToRemote();
+        showToast("Workspace initialised", "success");
+      }
+      // Start listening
+      fbStateRef.on("value", handleRemoteUpdate);
+      // Presence
+      updatePresenceSelf();
+      fbPresenceRef.on("value", handlePresenceUpdate);
+      // Activity
+      fbActivityRef.limitToLast(30).on("value", handleActivityUpdate);
+
+      isConnected = true;
+      setSyncUI(true);
+    }).catch(err => {
+      alert("Firebase error: " + err.message);
+      isConnected = false;
+      setSyncUI(false, err.message);
+    });
+  } catch (err) {
+    alert("Failed to initialise Firebase: " + err.message);
+    setSyncUI(false, err.message);
+  }
+}
+
+function disconnectFirebase() {
+  try {
+    if (fbPresenceRef && userId) fbPresenceRef.child(userId).remove();
+    if (fbStateRef) fbStateRef.off();
+    if (fbPresenceRef) fbPresenceRef.off();
+    if (fbActivityRef) fbActivityRef.off();
+    if (firebaseApp) firebaseApp.delete();
+  } catch (_) {}
+  firebaseApp = null; fbDb = null; fbStateRef = null; fbPresenceRef = null; fbActivityRef = null;
+  isConnected = false;
+  setSyncUI(false);
+}
+
+function handleRemoteUpdate(snap) {
+  const remote = snap.val();
+  if (!remote) return;
+  if (remote.updatedBy === userId && remote.updatedAt === lastPushedAt) return;
+  applyRemoteState(remote);
+  if (remote.lastEditor && remote.lastEditor !== userName) {
+    showToast(`Updated by ${remote.lastEditor}`, "info");
+  }
+}
+
+function applyRemoteState(remote) {
+  applyingRemote = true;
+  if (remote.periods) state.periods = remote.periods;
+  if (remote.currentPeriod) state.currentPeriod = remote.currentPeriod;
+  if (remote.lastEdit) state.lastEdit = remote.lastEdit;
+  Object.values(state.periods).forEach(p => { p.params = { ...DEFAULT_PARAMS, ...(p.params||{}) }; });
+  bindParams();
+  renderAll();
+  applyingRemote = false;
+}
+
+function schedulePush() {
+  if (applyingRemote || !fbStateRef) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushToRemote, 400);
+}
+
+function pushToRemote() {
+  if (!fbStateRef) return;
+  lastPushedAt = Date.now();
+  const payload = {
+    currentPeriod: state.currentPeriod,
+    periods: state.periods,
+    lastEdit: state.lastEdit,
+    updatedAt: lastPushedAt,
+    updatedBy: userId,
+    lastEditor: userName || "Anonymous"
+  };
+  fbStateRef.set(payload).catch(err => showToast("Sync failed: " + err.message, "warn"));
+  // Activity log (append, keep last 30 via listener)
+  if (fbActivityRef && state.lastEdit) {
+    fbActivityRef.push({
+      who: userName || "Anonymous",
+      whoId: userId,
+      at: lastPushedAt,
+      what: state.lastEdit.what || "edit",
+      period: state.currentPeriod
+    });
+  }
+}
+
+function updatePresenceSelf() {
+  if (!fbPresenceRef) return;
+  const selfRef = fbPresenceRef.child(userId);
+  selfRef.set({ name: userName || "Anonymous", lastSeen: firebase.database.ServerValue.TIMESTAMP });
+  selfRef.onDisconnect().remove();
+}
+
+function handlePresenceUpdate(snap) {
+  const p = snap.val() || {};
+  const list = Object.entries(p).map(([id, info]) => ({ id, ...info }));
+  renderPresence(list);
+}
+
+function renderPresence(list) {
+  const el = get("presenceList");
+  if (!list || !list.length) { el.innerHTML = '<span class="muted">Nobody connected yet.</span>'; return; }
+  el.innerHTML = list.map(u => `
+    <div class="presence-avatar ${u.id===userId?'self':''}" title="${escapeHTML(u.name)}${u.id===userId?' (you)':''}" style="${u.id===userId?'':'background:'+colorFromId(u.id)+';box-shadow:0 0 0 1px '+colorFromId(u.id)}">${escapeHTML(initials(u.name))}</div>
+  `).join("") + ` <span class="muted" style="align-self:center">${list.length} connected</span>`;
+}
+
+function handleActivityUpdate(snap) {
+  const entries = [];
+  snap.forEach(c => entries.push({ k: c.key, ...c.val() }));
+  entries.sort((a,b) => (b.at||0) - (a.at||0));
+  const el = get("activityLog");
+  if (!entries.length) { el.innerHTML = '<div class="muted" style="padding:8px">No activity yet.</div>'; return; }
+  el.innerHTML = entries.slice(0, 30).map(e => `
+    <div class="activity-item">
+      <span class="who">${escapeHTML(e.who||"?")}</span>
+      <span> ${escapeHTML(e.what||"edit")}</span>
+      <span class="muted">· ${escapeHTML(e.period||"")}</span>
+      <span class="when" style="float:right">${fmt.relTime(e.at)}</span>
+    </div>`).join("");
+}
+
+function setSyncUI(online, errorMsg) {
+  const chip = get("syncChip");
+  const label = get("syncLabel");
+  const fbStatus = get("fbStatus");
+  const btnC = get("btnConnect");
+  const btnD = get("btnDisconnect");
+  if (online) {
+    chip.className = "sync-chip online";
+    label.textContent = `Online · ${workspaceId}`;
+    fbStatus.className = "badge green";
+    fbStatus.textContent = "Connected — " + workspaceId;
+    btnC.style.display = "none";
+    btnD.style.display = "";
+  } else if (errorMsg) {
+    chip.className = "sync-chip error";
+    label.textContent = "Error";
+    fbStatus.className = "badge red";
+    fbStatus.textContent = errorMsg.slice(0, 60);
+    btnC.style.display = "";
+    btnD.style.display = "none";
+  } else {
+    chip.className = "sync-chip";
+    label.textContent = "Offline";
+    fbStatus.className = "badge grey";
+    fbStatus.textContent = "Not connected";
+    btnC.style.display = "";
+    btnD.style.display = "none";
+  }
+}
+
+function renderTeam() {
+  get("userNameInput").value = userName || "";
+  get("workspaceId").value = workspaceId || "credit-control-yesss";
+  const savedConfig = localStorage.getItem(LS_FB_KEY);
+  if (savedConfig && !get("firebaseConfig").value) {
+    get("firebaseConfig").value = savedConfig;
+  }
+}
+
+function showFirebaseHelp() {
+  showModal(`
+    <h3>Create a Firebase project (5 min, free)</h3>
+    <ol style="font-size:13px;line-height:1.7">
+      <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> and sign in with a Google account.</li>
+      <li>Click <strong>Add project</strong> → give it a name (e.g. "yesss-kpi-bonus") → skip Analytics.</li>
+      <li>In the project, click <strong>Build → Realtime Database</strong> → <strong>Create Database</strong>. Pick <strong>europe-west1</strong>. Start in <strong>test mode</strong> (we'll secure later if needed).</li>
+      <li>In <strong>Project Settings</strong> (gear icon) → <strong>Your apps</strong> → click the web icon <code>&lt;/&gt;</code>. Register the app — you don't need Firebase Hosting.</li>
+      <li>Firebase gives you a <code>firebaseConfig</code> object. Copy the whole object (just the <code>{ ... }</code> part) and paste it in this app.</li>
+      <li>Important: make sure the config includes a <code>databaseURL</code> (looks like <code>https://xxx.europe-west1.firebasedatabase.app</code>). If missing, get it from Realtime Database → Data tab.</li>
+      <li>Share the same config and Workspace ID with your teammate. Both paste it and click Connect.</li>
+    </ol>
+    <div class="actions"><button onclick="closeModal()">Got it</button></div>
+  `, 620);
+}
+
+// ============================================================
+// TOAST / MODAL
+// ============================================================
+function showToast(msg, kind = "info") {
+  const root = get("toastRoot");
+  const div = document.createElement("div");
+  div.className = "toast " + kind;
+  div.textContent = msg;
+  root.appendChild(div);
+  setTimeout(() => { div.style.opacity = "0"; setTimeout(() => div.remove(), 200); }, 3000);
+}
+
+function showModal(html, maxWidth = 500) {
+  closeModal();
+  get("modalRoot").innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+      <div class="modal" style="max-width:${maxWidth}px">${html}</div>
+    </div>`;
+}
+function closeModal() { get("modalRoot").innerHTML = ""; }
+
+// ============================================================
+// TABS
+// ============================================================
+function setupTabs() {
+  get("tabs").addEventListener("click", e => {
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    setActiveTab(tab.dataset.section);
+  });
+}
+function setActiveTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.section === name));
+  document.querySelectorAll(".section").forEach(s => s.classList.toggle("active", s.id === name));
+  if (name === "team") renderTeam();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderPeriodSelect();
+  renderInbound();
+  renderOutbound();
+  renderBD();
+  renderDebtor();
+  renderSummary();
+  renderHistory();
+  updateFormulaLabels();
+  autoSave();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+  if (!loadFromLocalStorage()) seedMarch();
+  if (!state.periods[state.currentPeriod]) {
+    state.currentPeriod = Object.keys(state.periods)[0] || "New month";
+    if (!state.periods[state.currentPeriod]) state.periods[state.currentPeriod] = emptyPeriod();
+  }
+  setupTabs();
+  bindParams();
+  renderAll();
+  setSyncUI(false);
+
+  // Auto-reconnect if Firebase config was saved
+  const savedConfig = localStorage.getItem(LS_FB_KEY);
+  if (savedConfig && userName) {
+    get("firebaseConfig").value = savedConfig;
+    get("workspaceId").value = workspaceId;
+    get("userNameInput").value = userName;
+    setTimeout(() => {
+      try { connectFirebase(); }
+      catch (e) { console.warn("Auto-connect failed:", e.message); }
+    }, 300);
+  }
+
+  // First-run user name prompt
+  if (!userName) {
+    setTimeout(() => {
+      const n = prompt("Welcome! What's your name? (used to tag your edits for teammates)");
+      if (n && n.trim()) {
+        userName = n.trim();
+        localStorage.setItem(LS_USER_KEY, userName);
+        renderTeam();
+      }
+    }, 400);
+  }
+})();
+</script>
+</body>
+</html>
