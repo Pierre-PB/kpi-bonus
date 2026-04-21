@@ -7,9 +7,44 @@
 
 <!-- SheetJS for Excel import/export -->
 <script src="./index_files/xlsx.full.min.js.téléchargement"></script>
-<!-- Firebase (compat build) for real-time sync -->
-<script src="./index_files/firebase-app-compat.js.téléchargement"></script>
-<script src="./index_files/firebase-database-compat.js.téléchargement"></script>
+<!-- Firebase (compat build) — jsDelivr primary with cdnjs fallback, for corporate networks that block gstatic.com -->
+<script>
+  // Dynamic Firebase loader with multi-CDN fallback
+  (function() {
+    var version = "10.7.1";
+    var cdns = [
+      "https://cdn.jsdelivr.net/npm/firebase@" + version + "/firebase-app-compat.min.js",
+      "https://unpkg.com/firebase@" + version + "/firebase-app-compat.min.js",
+      "https://www.gstatic.com/firebasejs/" + version + "/firebase-app-compat.js"
+    ];
+    var dbCdns = [
+      "https://cdn.jsdelivr.net/npm/firebase@" + version + "/firebase-database-compat.min.js",
+      "https://unpkg.com/firebase@" + version + "/firebase-database-compat.min.js",
+      "https://www.gstatic.com/firebasejs/" + version + "/firebase-database-compat.js"
+    ];
+    function loadScript(urls, i, done) {
+      if (i >= urls.length) { done(new Error("All CDNs failed for " + urls[0])); return; }
+      var s = document.createElement("script");
+      s.src = urls[i];
+      s.onload = function() { done(null, urls[i]); };
+      s.onerror = function() { loadScript(urls, i + 1, done); };
+      document.head.appendChild(s);
+    }
+    window.__firebaseReady = new Promise(function(resolve, reject) {
+      loadScript(cdns, 0, function(err1) {
+        if (err1) { reject(err1); return; }
+        loadScript(dbCdns, 0, function(err2) {
+          if (err2) { reject(err2); return; }
+          resolve();
+        });
+      });
+    });
+    window.__firebaseReady.catch(function(e) {
+      window.__firebaseLoadError = e.message;
+      console.warn("Firebase load failed:", e.message);
+    });
+  })();
+</script><script src="./index_files/firebase-app-compat.min.js.téléchargement"></script>
 
 <style>
   :root {
@@ -553,7 +588,7 @@
     .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
   }
 </style>
-</head>
+<script src="./index_files/firebase-database-compat.min.js.téléchargement"></script></head>
 <body>
 
 <!-- ======== APP HEADER ======== -->
@@ -1292,9 +1327,7 @@
 
     <div class="card">
       <h2>Currently connected</h2>
-      <div class="presence-list" id="presenceList">
-    <div class="presence-avatar self" title="Pierre Boncompain (you)" style="">PB</div>
-   <span class="muted" style="align-self:center">1 connected</span></div>
+      <div class="presence-list" id="presenceList"><span class="muted">Nobody connected yet.</span></div>
     </div>
 
     <div class="card">
@@ -2258,7 +2291,7 @@ function clearFirebaseConfig() {
   disconnectFirebase();
 }
 
-function connectFirebase() {
+async function connectFirebase() {
   if (!userName) {
     if (!confirm("You haven't set your name yet — you'll appear as 'Anonymous'. Continue?")) return;
     userName = "Anonymous";
@@ -2275,6 +2308,20 @@ function connectFirebase() {
   } catch (e) { alert("Invalid JSON: " + e.message); return; }
 
   localStorage.setItem(LS_FB_KEY, JSON.stringify(config));
+
+  // Wait for Firebase SDK to finish loading (multi-CDN fallback)
+  try {
+    await window.__firebaseReady;
+  } catch (e) {
+    alert("Unable to load the Firebase library from the network.\n\nThis usually means your corporate firewall blocks external CDNs.\n\nTested URLs: jsDelivr, unpkg, gstatic — all blocked.\n\nContact IT to allow one of: cdn.jsdelivr.net, unpkg.com, gstatic.com.");
+    setSyncUI(false, "CDN blocked by network");
+    return;
+  }
+  if (typeof firebase === "undefined") {
+    alert("Firebase SDK did not load. Check your network connection and refresh the page.");
+    setSyncUI(false, "Firebase SDK unavailable");
+    return;
+  }
 
   try {
     if (firebaseApp) { try { firebaseApp.delete(); } catch (_) {} }
@@ -2551,8 +2598,7 @@ function renderAll() {
     get("workspaceId").value = workspaceId;
     get("userNameInput").value = userName;
     setTimeout(() => {
-      try { connectFirebase(); }
-      catch (e) { console.warn("Auto-connect failed:", e.message); }
+      Promise.resolve(connectFirebase()).catch(e => console.warn("Auto-connect failed:", e.message));
     }, 300);
   }
 
